@@ -18,6 +18,12 @@ const (
 	OcmConfigAuthPolicy AuthPolicy = "ocmconfig"
 )
 
+// RoleMapping maps a role ID to its AMS resource type for AccessReview checks.
+type RoleMapping struct {
+	ID          string `yaml:"id"`
+	AMSResource string `yaml:"amsResource"`
+}
+
 // Config holds the application configuration
 type Config struct {
 	// Server configuration (CLI flags)
@@ -37,7 +43,7 @@ type Config struct {
 
 	// Security Configuration (environment variables)
 	AllowedAccounts []string
-	RolesConfigPath string
+	Roles           []RoleMapping
 	JWKCertFile     string
 	JWKCertURL      string
 
@@ -95,6 +101,8 @@ type configFile struct {
 		AllowedNamespaces []string `yaml:"allowed_namespaces"`
 		AllowedSecrets    []string `yaml:"allowed_secrets"`
 	} `yaml:"actions"`
+
+	Roles []RoleMapping `yaml:"roles"`
 }
 
 func readConfigFile(configFilePath string) *configFile {
@@ -121,6 +129,10 @@ func readConfigFile(configFilePath string) *configFile {
 
 // Load loads configuration from environment variables with defaults
 func Load(configFilePath string) *Config {
+	if os.Getenv("ROSA_TA_ROLES_CONFIG") != "" {
+		fmt.Fprintln(os.Stderr, "WARNING: ROSA_TA_ROLES_CONFIG is no longer supported — configure roles in the config file under the 'roles' key instead")
+	}
+
 	configFile := readConfigFile(configFilePath)
 
 	envAuthPolicy := getEnv("ROSA_TA_AUTH", "")
@@ -161,7 +173,7 @@ func Load(configFilePath string) *Config {
 
 		// Security Configuration
 		AllowedAccounts: getStringSliceEnv("ROSA_TA_ALLOWED_ACCOUNTS", nil),
-		RolesConfigPath: getEnv("ROSA_TA_ROLES_CONFIG", "configs/role_mapping.yaml"),
+		Roles:           configFile.Roles,
 		JWKCertFile:     getEnv("ROSA_TA_JWK_CERT_FILE", ""),
 		JWKCertURL:      getEnv("ROSA_TA_JWK_CERT_URL", "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/certs"),
 
